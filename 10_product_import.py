@@ -1,3 +1,4 @@
+import pandas
 from neo4j import GraphDatabase
 from neo4j_utils.csv_import import import_csv
 import os
@@ -27,9 +28,16 @@ import_csv(driver,
            MERGE (cat:Category {id:row.id}) SET cat += row
            """)
 
+
+# The discontinued info in the source data is stored as 0/1. Transform this into booleans.
+def discontinued_transform(df: pandas.DataFrame) -> pandas.DataFrame:
+    df['discontinued'] = df['discontinued'].apply(lambda x: True if x == 1 else False)
+    return df
+
+
 import_csv(driver,
            """
-           SELECT productID as id, productName, categoryID, quantityPerUnit, unitPrice 
+           SELECT productID as id, productName, categoryID, quantityPerUnit, unitPrice, discontinued
            FROM read_csv('data/products.csv')
            """,
            """
@@ -38,7 +46,7 @@ import_csv(driver,
            // WITH cat
            MERGE (p:Product {id:row.id}) SET p += row
            MERGE (p)-[:HAS_CATEGORY]->(cat)
-           """)
+           """, discontinued_transform)
 
 # cleanup useless/redundant properties
 driver.execute_query("MATCH (p:Product) SET p.categoryID = null")
